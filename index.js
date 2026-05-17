@@ -18,32 +18,38 @@ const app = express();
 
 const port = process.env.PORT || 4000;
 
+
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "http://localhost:5174"
+  ],
+  credentials: true
+}));
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 
 app.use(cookieParser());
-mongoose.connect(process.env.MONGODB_URI)
-.then(() => {
-    console.log("Connected to MongoDB 🚀");
     app.listen(port, () => {
-        console.log(`Server is running on port ${port}`);
-    });
-})
-.catch((error) => {
-    console.error("Error connecting to MongoDB:", error);
+    console.log(`Server running on port ${port}`);
 });
+
+mongoose.connect(process.env.MONGODB_URI)
+.then(() => console.log("Connected to MongoDB 🚀"))
+.catch(err => console.log("MongoDB error:", err));
+
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 }
 );
 
+
 app.use('/api/users', userRoutes);
 app.use('/api/loans', loanRoutes);
 
-
-app.use(cors({
-  origin: "http://localhost:5173",
-  origin: "http://localhost:5174",
-  credentials: true
-}));
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ message: "Server error" });
+});

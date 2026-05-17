@@ -83,18 +83,12 @@ const createUser = async (req, res) => {
     console.log(process.env.EMAIL_USER);
     console.log(process.env.EMAIL_PASS);
 
-    // const transporter = nodemailer.createTransport({
-    //   service: "gmail",
-    //   auth: {
-    //     user: process.env.EMAIL_USER,
-    //     pass: process.env.EMAIL_PASS,
-    //   },
-    // });
+   
 
     const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 587,
-  secure: false, // must be false for 587
+  secure: false, 
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
@@ -166,94 +160,77 @@ const deleteUser = async (req, res) => {
 };
 
 
-const authorize = (allowedRoles) => (req, res, next) => {
-  try {
-    const token = req.cookies?.token;
+const authorize = (roles = []) => {
+  return (req, res, next) => {
+    try {
+      const token = req.cookies.token;
 
-    if (!token) {
-      return res.status(401).json({
-        error: "Access denied. No token provided.",
-      });
+      if (!token) {
+        return res.status(401).json({ message: "No token found" });
+      }
+
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+      req.user = decoded;
+
+      if (roles.length && !roles.includes(decoded.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      next();
+    } catch (err) {
+      return res.status(401).json({ message: "Invalid token" });
     }
-
-    const decoded = jwt.verify(token, process.env.SECRETKEY);
-
-    req.user = decoded;
-
-    if (!allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({
-        error: "Access denied. Insufficient permissions.",
-      });
-    }
-
-    next();
-  } catch (err) {
-    console.error("Token error:", err.message);
-
-    if (err.name === "TokenExpiredError") {
-      return res.status(401).json({ error: "Token expired" });
-    }
-
-    if (err.name === "JsonWebTokenError") {
-      return res.status(401).json({ error: "Invalid token" });
-    }
-
-    return res.status(401).json({ error: "Authentication failed" });
-  }
+  };
 };
+
 
 
 const login = async (req, res) => {
   try {
-    let { email, Password } = req.body;
+    const { email, Password } = req.body;
 
-    if (!email || !Password) {
-      return res.status(400).json({ message: "Email and password are required" });
-    }
-
-    let user = await User.findOne({ email });
+    const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(400).json({ message: "Account doesn't exist" });
+      return res.status(404).json({ message: "User not found" });
     }
 
-    let checkPassword = await bcrypt.compare(Password, user.Password);
+    const isMatch = await bcrypt.compare(Password, user.Password);
 
-    if (!checkPassword) {
-      return res.status(400).json({ message: "Incorrect password" });
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    let token = jwt.sign(
-      {
-        id: user._id,
-        role: user.role
-      },
-      process.env.SECRETKEY,
-      { expiresIn: "1h" }
+    // create token
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
     );
 
+    // 🔥 SEND TOKEN IN HTTP-ONLY COOKIE
     res.cookie("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: false, // true in production (HTTPS)
       sameSite: "lax",
-      maxAge: 3600000
+      maxAge: 24 * 60 * 60 * 1000,
     });
 
     res.status(200).json({
       message: "Login successful",
       user: {
+        _id: user._id,
         Fullname: user.Fullname,
+        role: user.role,
         email: user.email,
-        role: user.role
-      }
+      },
     });
 
   } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ message: error.message });
   }
 };
-
 
 export {
   getAllUsers, getUserById, createUser, updateUser, deleteUser, authorize, login};

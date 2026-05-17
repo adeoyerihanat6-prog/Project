@@ -22,10 +22,6 @@ const getLoanById = async (req, res) => {
     }
 };
 
-
-
-
-
 const deleteLoan = async (req, res) => {
     try {
         const loanId = req.params.id;
@@ -41,8 +37,14 @@ const deleteLoan = async (req, res) => {
 
 const createLoan = async (req, res) => {
     try {
-        const { borrower, amount, interestRate, term } = req.body;
-        const newLoan = new Loan({ borrower, amount, interestRate, term });
+        const { amount, interestRate, term } = req.body;
+
+const newLoan = new Loan({
+  borrower: req.user_.id,
+  amount,
+  interestRate,
+  term,
+});
         await newLoan.save();
         res.status(201).json(newLoan);
     } catch (error) {
