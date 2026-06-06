@@ -23,7 +23,7 @@ const getUserById = async (req, res) => {
 
     if (!userData) {
       return res.status(404).json({ message: "User not found" });
-    }
+    }                                   
 
     res.status(200).json(userData);
   } catch (error) {
@@ -131,6 +131,7 @@ const updateUser = async (req, res) => {
       { new: true }
     );
 
+
     if (!updatedUser) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -148,7 +149,6 @@ const deleteUser = async (req, res) => {
     const userId = req.params.id;
 
     const deletedUser = await User.findByIdAndDelete(userId);
-
     if (!deletedUser) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -160,29 +160,7 @@ const deleteUser = async (req, res) => {
 };
 
 
-const authorize = (roles = []) => {
-  return (req, res, next) => {
-    try {
-      const token = req.cookies.token;
 
-      if (!token) {
-        return res.status(401).json({ message: "No token found" });
-      }
-
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-      req.user = decoded;
-
-      if (roles.length && !roles.includes(decoded.role)) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
-      next();
-    } catch (err) {
-      return res.status(401).json({ message: "Invalid token" });
-    }
-  };
-};
 
 
 
@@ -190,48 +168,75 @@ const login = async (req, res) => {
   try {
     const { email, Password } = req.body;
 
+    if (!email || !Password) {
+      return res.status(400).json({
+        message: "Email and Password are required",
+      });
+    }
+
     const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({
+        message: "User not found",
+      });
     }
 
-    const isMatch = await bcrypt.compare(Password, user.Password);
-
-    if (!isMatch) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
-
-    // create token
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
+    const isMatch = await bcrypt.compare(
+      Password,
+      user.Password
     );
 
-    // 🔥 SEND TOKEN IN HTTP-ONLY COOKIE
+    if (!isMatch) {
+      return res.status(400).json({
+          message: "Invalid credentials",
+      });
+    }
+
+    // Create token
+    const token = jwt.sign(
+      {
+        id: user._id,
+        role: user.role,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "1d",
+      }
+    );
+
+    // Save token in cookie
+    // res.cookie("token", token, {
+    //   httpOnly: true,
+    //   secure: process.env.NODE_ENV === "production",
+    //   sameSite: "lax",
+    //   maxAge: 24 * 60 * 60 * 1000,
+    // });
+
     res.cookie("token", token, {
-      httpOnly: true,
-      secure: false, // true in production (HTTPS)
-      sameSite: "lax",
-      maxAge: 24 * 60 * 60 * 1000,
-    });
+  httpOnly: true,
+  secure: false,
+  sameSite: "lax", // or "none"
+  maxAge: 24 * 60 * 60 * 1000,
+});
 
     res.status(200).json({
       message: "Login successful",
       user: {
         _id: user._id,
         Fullname: user.Fullname,
-        role: user.role,
         email: user.email,
+        role: user.role,
       },
     });
 
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
 export {
-  getAllUsers, getUserById, createUser, updateUser, deleteUser, authorize, login};
+  getAllUsers, getUserById, createUser, updateUser, deleteUser, login};
 

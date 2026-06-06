@@ -65,6 +65,8 @@ const loanSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const Loan = mongoose.model("Loan", loanSchema);
+const Loan =
+  mongoose.models.Loan ||
+  mongoose.model("Loan", loanSchema);
 
 export default Loan;
