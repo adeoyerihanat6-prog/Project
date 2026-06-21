@@ -24,6 +24,7 @@ app.use(
     origin: [
       "http://localhost:5173",
       "http://localhost:5174",
+      "https://loan-frontend-olive.vercel.app",
     ],
     credentials: true,
   })
